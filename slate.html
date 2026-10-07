@@ -3,6 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<script>
+  // Inside the iPhone app (Capacitor) the page gets an "ios-app" class: it hides what Apple's rules don't allow there
+  // (links to buy a membership elsewhere) and what can't work there (Google sign-in inside an app, offline caching).
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+    document.documentElement.classList.add('ios-app');
+    // iOS zooms in when a small text box is tapped and doesn't zoom back out; an app never needs to zoom.
+    document.querySelector('meta[name="viewport"]').setAttribute('content',
+      'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+    // The app fills the whole window: CSS screen-height units can come out short inside the app,
+    // which left a gap under the text boxes at the bottom of the project screen.
+    const fitHeight = () => document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
+    fitHeight();
+    window.addEventListener('resize', fitHeight);
+  }
+  // The Windows/Mac app (preload.js): Google sign-in can't return to the app there either, so its button is hidden too.
+  if (window.creativeflowDesktop) document.documentElement.classList.add('desktop-app');
+</script>
 <title>CreativeFlow (Beta)</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#0A0712">
@@ -55,6 +72,84 @@
     position: relative;
     z-index: 1;
   }
+  #screen-home > .grid[hidden] { display: none; }
+  #playlistChips[hidden] { display: none; }
+
+  /* All / Playlists toggle and the Long-form / Shorts filter */
+  .home-views { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 4px 20px 16px; }
+  .home-format[hidden] { display: none; }
+  .home-seg { display: flex; padding: 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); }
+  .home-seg-btn {
+    padding: 8px 18px; border: none; border-radius: 9px; background: transparent; color: var(--text-muted); cursor: pointer;
+    font: 800 13px var(--font-body); letter-spacing: 0.06em; text-transform: uppercase; transition: background 0.2s ease, color 0.2s ease;
+  }
+  .home-seg-btn[aria-selected="true"] { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 14px rgba(var(--accent-rgb), 0.35); }
+  .home-format { display: flex; gap: 6px; }
+  .home-format-btn {
+    padding: 7px 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+    font: 700 12.5px var(--font-body); cursor: pointer; transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .home-format-btn[aria-pressed="true"] { background: rgba(var(--accent-rgb), 0.16); border-color: rgba(var(--accent-rgb), 0.6); color: var(--text); }
+
+  /* Inside one playlist */
+  .playlist-head { position: relative; z-index: 2; display: flex; align-items: center; gap: 12px; padding: 0 20px 14px; }
+  .playlist-head[hidden] { display: none; }
+  .playlist-head-text { flex: 1; min-width: 0; }
+  .playlist-head-eyebrow { font-size: 11.5px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .playlist-head-name { font: 800 20px var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .playlist-head-count { font-size: 12.5px; color: var(--text-muted); flex: none; }
+
+  /* Playlists: a project-style card with more cards stacked behind it as videos are added */
+  .pl-card { background: none; border: none; padding: 0; display: flex; flex-direction: column; cursor: pointer; text-align: left; font-family: inherit; color: inherit;
+    animation: cfRiseIn 0.4s var(--ease-out) both; animation-delay: calc(var(--i, 0) * 40ms); }
+  .pl-stack { position: relative; padding-top: var(--stack-room, 0px); }
+  .pl-layer {
+    position: absolute; left: calc(var(--n) * 5%); right: calc(var(--n) * 5%); top: calc((var(--d) - var(--n)) * 7px); bottom: 0;
+    border-radius: 12px; background: var(--surface-2) center / cover no-repeat; border: 1px solid var(--border);
+    opacity: calc(1 - var(--n) * 0.22); transition: transform 0.3s var(--ease-out);
+  }
+  .pl-layer::after { content: ''; position: absolute; inset: 0; border-radius: inherit; background: rgba(0, 0, 0, calc(0.15 + var(--n) * 0.12)); }
+  .pl-front { position: relative; z-index: 1; box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.3); transition: transform 0.3s var(--ease-out); }
+  .pl-card:hover .pl-layer { transform: translateY(calc(var(--n) * -3px)); }
+  .pl-card:hover .pl-front { transform: translateY(2px); }
+  .pl-badge { position: absolute; top: 10px; left: 10px; display: flex; align-items: center; gap: 6px; padding: 5px 9px; border-radius: 8px;
+    background: rgba(0, 0, 0, 0.6); color: #FFFFFF; font-size: 11.5px; font-weight: 800; letter-spacing: 0.05em; }
+  .pl-count { position: absolute; right: 10px; bottom: 10px; padding: 4px 9px; border-radius: 8px; background: rgba(0, 0, 0, 0.6); color: #FFFFFF; font-size: 12px; font-weight: 700; }
+  .pl-card.new .pl-front { background: transparent; border: 1.5px dashed var(--border); box-shadow: none; color: var(--text-muted); flex-direction: column; gap: 4px; }
+  .pl-plus { font-size: 30px; line-height: 1; font-weight: 300; }
+  .folder-grid .empty-home { grid-column: 1 / -1; }
+  .actions-pl-summary { font-size: 13.5px; color: var(--text-muted); margin: 0 0 8px; line-height: 1.4; }
+  .actions-pl-summary b { color: var(--text); font-weight: 700; }
+  .save-pl-video { margin: -4px 0 12px; font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .save-pl-list { display: flex; flex-direction: column; gap: 4px; max-height: 46vh; overflow-y: auto; }
+  .save-pl-row {
+    display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; border-radius: 12px; border: none; background: transparent;
+    color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: background 0.15s ease;
+  }
+  .save-pl-row:hover, .save-pl-row:focus-visible { background: var(--surface-2); outline: none; }
+  .save-pl-cover { width: 64px; flex: none; aspect-ratio: 16 / 9; border-radius: 7px; background: var(--surface-2) center / cover no-repeat; border: 1px solid var(--border); }
+  .save-pl-text { flex: 1; min-width: 0; }
+  .save-pl-name { font-weight: 700; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .save-pl-count { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+  .save-pl-mark { flex: none; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); transition: color 0.15s ease, transform 0.2s var(--ease-pop, ease); }
+  .save-pl-row.saved .save-pl-mark { color: var(--accent); }
+  .save-pl-row.pop .save-pl-mark { animation: cfPop 0.35s var(--ease-pop, ease); }
+  .save-pl-new { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 6px; padding: 10px 8px; border: none; border-top: 1px solid var(--border); background: none; color: var(--text); font: 700 14.5px var(--font-body); cursor: pointer; text-align: left; }
+  .save-pl-plus { width: 64px; flex: none; text-align: center; font-size: 22px; font-weight: 400; color: var(--accent); }
+  .save-pl-create { display: flex; gap: 8px; margin-top: 4px; }
+  .save-pl-create[hidden] { display: none; }
+  .save-pl-create .onboard-input { flex: 1; min-width: 0; }
+  .pl-new-video .card-thumb { background: transparent; border: 1.5px dashed var(--border); color: var(--text-muted); flex-direction: column; gap: 6px; font-weight: 700; font-size: 14px; }
+  .pl-new-video .card-thumb .pl-plus { color: var(--accent); }
+  .pl-new-video:hover .card-thumb { border-color: var(--accent); color: var(--text); }
+  .pl-thumb-row { display: flex; gap: 12px; align-items: center; margin-bottom: 4px; }
+  .pl-thumb-preview { width: 128px; flex: none; aspect-ratio: 16 / 9; border-radius: 10px; background: var(--surface-2) center / cover no-repeat; border: 1px solid var(--border); }
+  .pl-thumb-actions { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .pl-thumb-actions .sheet-btn { margin-bottom: 6px; }
+  #playlistHeadMenu { font-size: 18px; font-weight: 800; }
+  #plThumbResetBtn[hidden] { display: none; }
+  @media (max-width: 699px) { .home-views { padding: 4px 16px 14px; } .home-format-btn { padding: 6px 10px; font-size: 12px; } }
+  @media (prefers-reduced-motion: reduce) { .pl-card { animation: none; } .pl-layer, .pl-front { transition: none; } }
   html, body { margin: 0; padding: 0; }
   body {
     background: var(--bg);
@@ -241,6 +336,11 @@
     padding-bottom: calc(16px + var(--safe-bottom));
   }
   .screen.active { display: flex; }
+  /* Screens that end in a text box bar (ideas, Adonis): the bar already leaves room for the
+     phone's home bar, so the screen itself adds none (it used to be counted twice). */
+  body:not(.has-tab-bar) #screen-project, body:not(.has-tab-bar) #screen-ai { padding-bottom: 0; }
+  html.ios-app body, html.ios-app #app { min-height: var(--app-h, 100dvh); }
+
 
   /* ---------- Splash ---------- */
   #screen-splash {
@@ -664,6 +764,13 @@
   .lb-row.you { border-color: var(--accent); }
   .lb-rank { width: 30px; text-align: center; font-weight: 800; font-size: 15px; color: var(--text-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
   .lb-rank.r1 { color: #F5C542; } .lb-rank.r2 { color: #C9CED6; } .lb-rank.r3 { color: #D9955B; }
+  .lb-avatar img, .lbp-avatar img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+  .lb-avatar { overflow: hidden; }
+  .lbp-bio { margin-top: 12px; font-size: 14.5px; line-height: 1.5; color: #E6E3EF; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .lb-you.clickable { cursor: pointer; transition: transform 0.12s ease, background 0.15s ease; }
+  .lb-you.clickable:active { transform: scale(0.99); }
+  .lb-you-view { font-size: 12.5px; font-weight: 700; color: var(--accent); flex: none; }
+  .ep-view-profile { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 4px 0 18px; }
   .lb-avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--surface-2); color: var(--text); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; flex-shrink: 0; }
   .lb-name { flex: 1; min-width: 0; }
   .lb-name-line { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 14.5px; min-width: 0; }
@@ -674,6 +781,54 @@
   .lb-score-label { font-size: 11px; color: var(--text-muted); }
   .lb-badge-crown { font-size: 13px; }
   .lb-badge-img { height: 14px; width: auto; display: block; }
+  button.lb-row { width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; transition: border-color 0.15s ease, transform 0.12s ease, background 0.15s ease; }
+  button.lb-row:hover { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+  button.lb-row:active { transform: scale(0.99); }
+
+  /* Profile card, opened by tapping someone on the leaderboard */
+  .lbp-backdrop {
+    position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    animation: cfFadeIn 0.2s ease both;
+  }
+  .lbp-backdrop[hidden] { display: none; }
+  .lbp-card {
+    position: relative; width: min(400px, 100%); max-height: calc(100% - 24px); overflow-y: auto; box-sizing: border-box;
+    border-radius: 20px; background: #18181E; border: 1px solid rgba(255, 255, 255, 0.08); color: #FFFFFF;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55); animation: obCardIn 0.35s cubic-bezier(0.2, 0.9, 0.25, 1) both;
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  }
+  .lbp-banner { height: 84px; background: linear-gradient(135deg, var(--lbp-color, #5865F2), color-mix(in srgb, var(--lbp-color, #5865F2) 40%, #2E1A5E)); }
+  .lbp-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%; border: none; cursor: pointer; background: rgba(0, 0, 0, 0.35); color: #FFFFFF; display: flex; align-items: center; justify-content: center; }
+  .lbp-body { padding: 0 20px 20px; }
+  .lbp-avatar {
+    width: 84px; height: 84px; margin-top: -42px; border-radius: 50%; border: 6px solid #18181E; box-sizing: border-box;
+    background: var(--lbp-color, #5865F2); display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: 800;
+  }
+  .lbp-name-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .lbp-name { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; word-break: break-word; }
+  .lbp-you { font-size: 12px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: rgba(88, 101, 242, 0.25); color: #C9CDFF; }
+  .lbp-sub { font-size: 13px; color: #A6A3B3; margin-top: 4px; }
+  .lbp-level { margin-top: 16px; padding: 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.07); }
+  .lbp-level-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: #A6A3B3; }
+  .lbp-level-top b { font-size: 17px; color: #FFFFFF; }
+  .lbp-bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); margin-top: 10px; overflow: hidden; }
+  .lbp-bar i { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #5865F2, #9B7BFF); transition: width 0.7s cubic-bezier(0.2, 0.9, 0.25, 1); }
+  .lbp-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+  .lbp-stat { padding: 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.07); }
+  .lbp-stat-num { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .lbp-stat-label { font-size: 12px; color: #A6A3B3; margin-top: 2px; }
+  .lbp-section { font-size: 12px; font-weight: 700; color: #A6A3B3; text-transform: uppercase; letter-spacing: 0.06em; margin: 16px 0 8px; }
+  .lbp-badges { display: flex; flex-wrap: wrap; gap: 8px; }
+  .lbp-badge { display: flex; align-items: center; gap: 8px; padding: 8px 12px 8px 8px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 13.5px; font-weight: 700; }
+  .lbp-badge img { height: 22px; width: auto; display: block; }
+  .lbp-badge-emoji { font-size: 18px; line-height: 1; }
+  .lbp-link {
+    display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 16px; height: 44px; border-radius: 12px;
+    background: #5865F2; color: #FFFFFF; font-weight: 700; font-size: 14.5px; text-decoration: none; transition: background 0.15s ease;
+  }
+  .lbp-link:hover { background: #4752C4; }
+  @media (prefers-reduced-motion: reduce) { .lbp-backdrop, .lbp-card { animation: none; } .lbp-bar i { transition: none; } }
 
   /* ---------- Customize (Settings) ---------- */
   .brand-name {
@@ -1063,6 +1218,38 @@
   @media (prefers-reduced-motion: reduce) {
     #screen-write.active .write-head, #screen-write .write-hooks, #screen-write .write-hooks[hidden], .write-saved.saving::before { animation: none; }
   }
+
+  /* ---------- iPhone app (see the ios-app class in <head>) ---------- */
+  html.ios-app #licenseRenewBtn, html.ios-app .license-buy-hint { display: none !important; }
+  html.ios-app .cl-socialButtonsRoot, html.ios-app .cl-dividerRow,
+  html.desktop-app .cl-socialButtonsRoot, html.desktop-app .cl-dividerRow { display: none !important; }
+
+  /* ---------- Google/Apple sign-in in the apps ---------- */
+  .native-sso { display: none; max-width: 400px; margin: 0 auto 4px; padding: 0 4px; }
+  html.desktop-app .native-sso, html.ios-app .native-sso { display: block; }
+  .native-sso-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; height: 46px; margin-bottom: 10px;
+    border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer;
+    font: 600 15px var(--font-body); transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  }
+  .native-sso-btn:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+  .native-sso-btn:active { transform: scale(0.98); }
+  .native-sso-btn:disabled { opacity: 0.55; cursor: default; }
+  .native-sso-status { font-size: 13.5px; color: var(--text-muted); text-align: center; margin: 2px 0 10px; line-height: 1.45; }
+  .native-sso-status button { background: none; border: none; color: var(--accent); font: inherit; cursor: pointer; padding: 0; text-decoration: underline; }
+  .native-sso-or { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 12.5px; margin: 8px 0 4px; }
+  .native-sso-or::before, .native-sso-or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  /* ---------- Reminders (iPhone app only) ---------- */
+  .reminders-section { display: none; }
+  .ios-only { display: none !important; }
+  html.ios-app .ios-only { display: block !important; }
+  html.ios-app .reminders-section { display: block; }
+  .reminder-options[hidden] { display: none; }
+  .reminder-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .reminder-chip { padding: 8px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font: 700 13px var(--font-body); cursor: pointer; }
+  .reminder-chip[aria-pressed="true"] { background: rgba(var(--accent-rgb), 0.18); border-color: var(--accent); color: var(--text); }
+  .reminder-time { max-width: 160px; }
 
   /* ---------- Scripts page ---------- */
   .scripts-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
@@ -2406,14 +2593,38 @@
     margin-top: 1px;
   }
   .ai-bubble {
-    max-width: 85%;
-    padding: 11px 14px;
-    border-radius: 14px;
-    font-size: 14px;
+    max-width: 88%;
+    padding: 12px 16px;
+    border-radius: 20px;
+    font-size: 16px;
     line-height: 1.55;
     white-space: pre-wrap;
     word-break: break-word;
   }
+  /* Adonis's replies are formatted (bold, lists, headings), so normal line wrapping. */
+  .ai-bubble.assistant.md { white-space: normal; }
+  .ai-md > :first-child { margin-top: 0; }
+  .ai-md > :last-child { margin-bottom: 0; }
+  .ai-md p { margin: 0 0 10px; }
+  .ai-md h1, .ai-md h2, .ai-md h3 { font-size: 17px; font-weight: 800; margin: 14px 0 6px; line-height: 1.35; }
+  .ai-md ul, .ai-md ol { margin: 0 0 10px; padding-left: 22px; }
+  .ai-md li { margin: 3px 0; }
+  .ai-md li::marker { color: var(--accent); }
+  .ai-md strong { font-weight: 800; }
+  .ai-md code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.9em; background: var(--surface-2); padding: 1px 5px; border-radius: 5px; }
+  .ai-md pre { background: var(--surface-2); padding: 10px 12px; border-radius: 10px; overflow-x: auto; margin: 0 0 10px; white-space: pre; }
+  .ai-md pre code { background: none; padding: 0; }
+  .ai-md hr { border: none; height: 1px; background: var(--border); margin: 12px 0; }
+  .ai-md a { color: var(--accent); }
+  /* Chats: the screen is exactly one window tall, so only the messages scroll and the text box stays put. */
+  #screen-ai.active,
+  #screen-project.active:has(#panel-ai.active),
+  #screen-project.active:has(#panel-ideas.active) {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 1; overflow: hidden; padding-bottom: 0;
+  }
+  /* With the bottom bar showing, the chat ends exactly where the bar starts (its height is measured). */
+  body.has-tab-bar #screen-ai.active { bottom: var(--tabbar-h, calc(68px + var(--safe-bottom))); padding-bottom: 0; }
+  .ai-chat-list { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .ai-bubble.user {
     align-self: flex-end;
     background: var(--accent);
@@ -2422,10 +2633,10 @@
   }
   .ai-bubble.assistant {
     align-self: flex-start;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-bottom-left-radius: 4px;
+    background: var(--surface-2);
+    border-bottom-left-radius: 6px;
   }
+  .ai-bubble.user { border-bottom-right-radius: 6px; }
   .ai-bubble.assistant.error {
     color: var(--danger);
     border-color: var(--danger);
@@ -3376,15 +3587,15 @@
     .tab-bar-add { flex: 0 0 68px; }
     .tab-bar-add:active { background: none; }
     .tab-bar-add-circle {
-      width: 50px; height: 50px;
-      margin-top: -20px;
+      width: 46px; height: 46px;
+      margin-top: 0;
       border-radius: 50%;
       background: var(--accent);
       color: var(--accent-ink);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 0 4px var(--bg);
+      box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 40%, transparent);
       transition: transform 0.18s ease;
     }
     .tab-bar-add:active .tab-bar-add-circle { transform: scale(0.93); }
@@ -3477,6 +3688,19 @@
       </div>
     </div>
     <div class="auth-body">
+      <!-- Apps only (desktop/iPhone): Google and Apple sign-in through the normal browser. -->
+      <div class="native-sso" id="nativeSso">
+        <button type="button" class="native-sso-btn" data-strategy="oauth_google">
+          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+          Continue with Google
+        </button>
+        <button type="button" class="native-sso-btn" data-strategy="oauth_apple">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.48.83-.72 0-1.82-.81-3-.79-1.54.02-2.96.9-3.76 2.28-1.6 2.78-.41 6.9 1.15 9.15.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.4-.92-2.42-3.65zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.02.61-2.67 1.37-.58.67-1.1 1.76-.96 2.8 1.02.08 2.05-.52 2.69-1.28z"/></svg>
+          Continue with Apple
+        </button>
+        <p class="native-sso-status" id="nativeSsoStatus" hidden></p>
+        <div class="native-sso-or"><span>or use your email</span></div>
+      </div>
       <div id="clerk-auth-mount"></div>
     </div>
   </section>
@@ -3567,9 +3791,33 @@
     </div>
     <input type="file" id="importFileInput" accept="application/json,.json" hidden aria-label="Import backup file">
 
+    <div class="home-views" id="homeViews">
+      <div class="home-seg" role="tablist" aria-label="Show">
+        <button type="button" class="home-seg-btn" data-view="all" role="tab">All</button>
+        <button type="button" class="home-seg-btn" data-view="playlists" role="tab">Playlists</button>
+      </div>
+      <div class="home-format" role="group" aria-label="Video type">
+        <button type="button" class="home-format-btn" data-format="all">All types</button>
+        <button type="button" class="home-format-btn" data-format="long">Long-form</button>
+        <button type="button" class="home-format-btn" data-format="short">Shorts</button>
+      </div>
+    </div>
+    <div class="playlist-head" id="playlistHead" hidden>
+      <button type="button" class="back-btn" id="playlistHeadBack" aria-label="Back to playlists">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="playlist-head-text">
+        <div class="playlist-head-eyebrow">Playlist</div>
+        <div class="playlist-head-name" id="playlistHeadName"></div>
+      </div>
+      <div class="playlist-head-count" id="playlistHeadCount"></div>
+      <button type="button" class="icon-btn" id="playlistHeadMenu" aria-label="Playlist options">⋮</button>
+    </div>
+
     <div class="chip-row" id="playlistChips"></div>
 
     <div class="grid" id="projectGrid"></div>
+    <div class="grid folder-grid" id="folderGrid" hidden></div>
 
     <div class="fab-menu" id="fabMenu">
       <button type="button" class="fab-menu-item" id="fabPlanVideoBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3"/><rect x="9" y="2" width="6" height="4" rx="1"/><path d="m9 14 2 2 4-4"/></svg> Plan a Video</button>
@@ -4091,6 +4339,36 @@
         </div>
         <button type="button" class="feature-switch" id="settingsLeaderboardSwitch" aria-label="Show me on the leaderboard"></button>
       </div>
+      <div class="feature-toggle-row">
+        <div class="feature-toggle-text">
+          <div class="feature-toggle-name">Show my channel link</div>
+          <div class="feature-toggle-desc">Adds a button to your channel on your leaderboard profile. Uses the channel link from Edit profile.</div>
+        </div>
+        <button type="button" class="feature-switch" id="settingsChannelLinkSwitch" aria-label="Show my channel link on my leaderboard profile"></button>
+      </div>
+
+      <div class="reminders-section">
+        <div class="onboard-field-label" style="margin-top:26px;">Reminders</div>
+        <div class="feature-toggle-row">
+          <div class="feature-toggle-text">
+            <div class="feature-toggle-name">Remind me about scheduled videos</div>
+            <div class="feature-toggle-desc">A notification before a video's scheduled upload date, with what's still left to do.</div>
+          </div>
+          <button type="button" class="feature-switch" id="settingsRemindersSwitch" aria-label="Remind me about scheduled videos"></button>
+        </div>
+        <div class="reminder-options" id="reminderOptions">
+          <div class="onboard-hint" style="margin:10px 0 8px;">When</div>
+          <div class="reminder-chips" id="reminderOffsets">
+            <button type="button" class="reminder-chip" data-offset="7">1 week before</button>
+            <button type="button" class="reminder-chip" data-offset="3">3 days before</button>
+            <button type="button" class="reminder-chip" data-offset="1">1 day before</button>
+            <button type="button" class="reminder-chip" data-offset="0">On the day</button>
+          </div>
+          <div class="onboard-hint" style="margin:14px 0 8px;">At</div>
+          <input type="time" class="onboard-input reminder-time" id="reminderTime" value="09:00" aria-label="Reminder time">
+          <button type="button" class="sheet-btn" id="reminderTestBtn" style="margin-top:12px;">Send a test notification</button>
+        </div>
+      </div>
 
       <div class="onboard-field-label" style="margin-top:26px;">Adonis response style</div>
       <div class="onboard-hint" style="margin-bottom:12px;">Changes how Adonis answers you throughout the app.</div>
@@ -4121,6 +4399,7 @@
       </div>
     </div>
     <div class="settings-body">
+      <button type="button" class="sheet-btn ep-view-profile" id="editProfileViewBtn">View my profile</button>
 
       <div class="account-avatar-row">
         <button type="button" class="account-avatar-btn" id="settingsAvatarBtn" aria-label="Change profile picture">
@@ -4353,6 +4632,52 @@
   </div>
 </div>
 
+<div class="lbp-backdrop" id="lbProfile" hidden>
+  <div class="lbp-card" role="dialog" aria-modal="true" aria-labelledby="lbpName" id="lbProfileCard"></div>
+</div>
+
+<!-- SAVE TO PLAYLIST SHEET (YouTube-style) -->
+<div class="sheet-backdrop" id="saveToPlBackdrop">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>Save to playlist</h3>
+    <p class="save-pl-video" id="saveToPlVideo"></p>
+    <div class="save-pl-list" id="saveToPlList"></div>
+    <button type="button" class="save-pl-new" id="saveToPlNewBtn"><span class="save-pl-plus">+</span>New playlist</button>
+    <div class="save-pl-create" id="saveToPlCreate" hidden>
+      <input type="text" class="onboard-input" id="saveToPlNewName" placeholder="Playlist name" maxlength="40" aria-label="New playlist name" autocomplete="off">
+      <button type="button" class="planner-action solid" id="saveToPlCreateBtn" disabled>Create</button>
+    </div>
+    <div class="sheet-actions" style="margin-top:10px;">
+      <button class="btn-create" id="saveToPlDoneBtn">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- PLAYLIST ACTIONS SHEET -->
+<div class="sheet-backdrop" id="plActionsBackdrop">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3 id="plActionsTitle">Playlist</h3>
+    <div class="sheet-section-label">Name</div>
+    <input type="text" class="onboard-input" id="plRenameInput" maxlength="40" aria-label="Playlist name" autocomplete="off">
+    <div class="sheet-section-label">Thumbnail</div>
+    <div class="pl-thumb-row">
+      <div class="pl-thumb-preview" id="plThumbPreview"></div>
+      <div class="pl-thumb-actions">
+        <button type="button" class="sheet-btn" id="plThumbUploadBtn">Change thumbnail</button>
+        <button type="button" class="sheet-btn" id="plThumbResetBtn">Use the first video's thumbnail</button>
+      </div>
+    </div>
+    <input type="file" id="plThumbInput" accept="image/*" hidden>
+    <button type="button" class="sheet-btn" id="plDuplicateBtn" style="margin-top:6px;">Duplicate playlist</button>
+    <button type="button" class="sheet-btn danger" id="plDeleteBtn">Delete playlist</button>
+    <div class="sheet-actions" style="margin-top:6px;">
+      <button class="btn-cancel" id="plActionsCloseBtn">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- PROJECT ACTIONS SHEET -->
 <div class="sheet-backdrop" id="actionsSheetBackdrop">
   <div class="sheet">
@@ -4360,10 +4685,12 @@
     <h3 id="actionsProjectName">Project</h3>
     <button type="button" class="sheet-btn" id="actionsDuplicateBtn">Duplicate project</button>
     <button type="button" class="sheet-btn" id="actionsPublishBtn">Mark as Published</button>
+    <button type="button" class="sheet-btn ios-only" id="actionsAddReminderBtn">Add to Reminders</button>
     <div class="sheet-section-label">Scheduled upload date</div>
     <input type="date" class="onboard-input" id="actionsScheduledDate" aria-label="Scheduled upload date">
     <div class="sheet-section-label">Playlists</div>
-    <div id="actionsPlaylistList"></div>
+    <div class="actions-pl-summary" id="actionsPlaylistList"></div>
+    <button type="button" class="sheet-btn" id="actionsSaveToPlBtn">Add to playlist</button>
     <button type="button" class="sheet-btn danger" id="actionsDeleteBtn" style="margin-top:6px;">Delete project</button>
     <div class="sheet-actions" style="margin-top:6px;">
       <button class="btn-cancel" id="actionsCloseBtn">Close</button>
@@ -4439,10 +4766,20 @@
   // ---------- Version, what's new, bug reports ----------
   // Keep APP_VERSION in step with "version" in package.json. The desktop app reports its real
   // version itself; this is what the web/phone version shows.
-  const APP_VERSION = '1.0.12';
+  const APP_VERSION = '1.0.13';
   const REPORT_URL = 'https://creativeflow-ai.netlify.app/api/report';
   // Newest first. Add an entry for every release; only the newest is shown on the Updates & help page.
   const CHANGELOG = [
+    { version: '1.0.13', date: '2026-10-07', changes: [
+      'New: CreativeFlow for Mac.',
+      'Sign in with Google or Apple in the Windows and Mac apps. It opens your browser to sign in, then brings you back to the app.',
+      'New on the website too: Continue with Apple.',
+      'Home has All and Playlists. Playlists look like stacked video cards, with a ⋮ menu to rename, change the thumbnail, duplicate or delete.',
+      'Save to playlist from a video\'s ⋮ menu, and make new videos right inside a playlist.',
+      'Filter All by Long-form or Shorts, and every video now shows a LONG or SHORT tag.',
+      'Leaderboard profiles: tap anyone to see their level, XP, ranks, badges, bio and picture. Open your own from the leaderboard or Edit profile. Share your channel link if you want (Settings).',
+      'Adonis chat has a cleaner look, with bigger text and proper formatting, and the text box stays at the bottom.'
+    ] },
     { version: '1.0.12', date: '2026-10-01', changes: [
       'New look: the setup questions and Plan a Video are now cards with option tiles, smooth animations and a progress bar.',
       'Plan a Video floats over your page, and the script step lets you drop in a script (PDF, Word or text) or use one you have already written.',
@@ -4677,10 +5014,36 @@
       state = normalizeState(raw ? JSON.parse(raw) : {});
     } catch (e) { console.error('CreativeFlow: failed to load', e); state = normalizeState({}); }
   }
+  // A ~72px copy of the profile picture goes to the leaderboard (the full one is too big to send
+  // with every row). Remade whenever the picture changes.
+  var smallAvatarBusy = false;
+  function ensureSmallAvatar() {
+    const pic = state.profile && state.profile.profilePicture;
+    const key = pic ? pic.length + ':' + pic.slice(-40) : '';
+    if ((state.profile.avatarSmallKey || '') === key || smallAvatarBusy) return;
+    if (!pic) { state.profile.avatarSmall = ''; state.profile.avatarSmallKey = ''; save(); return; }
+    smallAvatarBusy = true;
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = c.height = 72;
+      const s = Math.min(img.width, img.height);
+      c.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 72, 72);
+      state.profile.avatarSmall = c.toDataURL('image/jpeg', 0.8);
+      state.profile.avatarSmallKey = key;
+      smallAvatarBusy = false;
+      save();
+    };
+    img.onerror = () => { smallAvatarBusy = false; };
+    img.src = pic;
+  }
+
   function save() {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
     catch (e) { console.error('CreativeFlow: failed to save', e); }
     if (syncUserId && !syncApplying) scheduleSync();
+    if (typeof scheduleRemindersSoon === 'function') scheduleRemindersSoon();
+    if (state.profile && (state.profile.avatarSmallKey || '') !== (state.profile.profilePicture ? state.profile.profilePicture.length + ':' + state.profile.profilePicture.slice(-40) : '')) setTimeout(ensureSmallAvatar, 0);
   }
 
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
@@ -4869,16 +5232,217 @@
     return d.innerHTML;
   }
 
+  // Home: "All" (every video) or "Playlists" (folders; tap one to open it). The Long-form /
+  // Shorts filter and Active / Published apply in both.
+  var homeView = 'all';        // 'all' | 'playlists'
+  var openPlaylistId = null;   // the folder that's open in the Playlists view
+  var homeFormat = 'all';      // 'all' | 'long' | 'short'
+  try { homeFormat = localStorage.getItem('slate.homeFormat') || 'all'; } catch (e) {}
+
+  function formatMatches(p) { return homeFormat === 'all' || (homeFormat === 'short') === (p.format === 'short'); }
+
   function getFilteredProjects() {
     let list = state.projects.slice();
     if (filterMode.type === 'active') list = list.filter(p => !p.published);
     else if (filterMode.type === 'published') list = list.filter(p => p.published);
-    else if (filterMode.type === 'playlist') list = list.filter(p => (p.playlists || []).includes(filterMode.id));
-    return list;
+    if (homeView === 'playlists' && openPlaylistId) list = list.filter(p => (p.playlists || []).includes(openPlaylistId));
+    return homeView === 'all' ? list.filter(formatMatches) : list; // the type filter is only on "All"
   }
+
+  function renderHomeViews() {
+    if (openPlaylistId && !state.playlists.some(pl => pl.id === openPlaylistId)) openPlaylistId = null;
+    if (filterMode.type === 'playlist') filterMode = { type: 'active' };
+    document.querySelectorAll('.home-seg-btn').forEach(b => b.setAttribute('aria-selected', String(b.dataset.view === homeView)));
+    document.querySelectorAll('.home-format-btn').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.format === homeFormat)));
+    document.querySelector('.home-format').hidden = homeView !== 'all';
+    const inFolders = homeView === 'playlists' && !openPlaylistId;
+    document.getElementById('projectGrid').hidden = inFolders;
+    document.getElementById('folderGrid').hidden = !inFolders;
+    const head = document.getElementById('playlistHead');
+    const pl = homeView === 'playlists' && openPlaylistId ? state.playlists.find(x => x.id === openPlaylistId) : null;
+    head.hidden = !pl;
+    if (pl) {
+      document.getElementById('playlistHeadName').textContent = pl.name;
+      const n = state.projects.filter(p => (p.playlists || []).includes(pl.id)).length;
+      document.getElementById('playlistHeadCount').textContent = n + ' video' + (n === 1 ? '' : 's');
+    }
+    if (inFolders) renderFolderGrid();
+  }
+
+  function renderFolderGrid() {
+    const grid = document.getElementById('folderGrid');
+    grid.innerHTML = '';
+    const avatarSrc = document.querySelector('.brand-mark-img') ? document.querySelector('.brand-mark-img').src : '';
+    const playIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>';
+    state.playlists.forEach((pl, i) => {
+      const inIt = state.projects.filter(p => (p.playlists || []).includes(pl.id));
+      const depth = Math.min(inIt.length - 1, 3); // cards behind the front one: more videos, taller stack
+      const cover = inIt[0];
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'pl-card';
+      card.style.setProperty('--i', Math.min(i, 10));
+      const layers = [];
+      for (let n = Math.max(depth, 0); n >= 1; n--) {
+        const p = inIt[n];
+        const bg = p && p.thumbnail && p.format !== 'short' ? 'background-image:url(' + p.thumbnail + ')' : (p ? 'background:linear-gradient(135deg,' + p.color + '55,' + p.color + '1A)' : '');
+        layers.push('<div class="pl-layer" style="--n:' + n + ';' + bg + '"></div>');
+      }
+      const coverImg = pl.thumbnail || (cover && cover.thumbnail && cover.format !== 'short' ? cover.thumbnail : null);
+      const frontStyle = coverImg
+        ? 'background-image:url(' + coverImg + ')'
+        : 'background:linear-gradient(135deg, ' + (cover ? cover.color : '#8358FF') + '55, ' + (cover ? cover.color : '#8358FF') + '1A)';
+      card.innerHTML = '<div class="pl-stack" style="--d:' + Math.max(depth, 0) + ';--stack-room:' + (Math.max(depth, 0) * 7) + 'px">' + layers.join('')
+        + '<div class="card-thumb pl-front" style="' + frontStyle + '">'
+        + (coverImg ? '' : '<div class="card-thumb-icon" aria-hidden="true">' + playIcon.replace(/13/g, '26') + '</div>')
+        + '<span class="card-menu-btn" role="button" tabindex="0" aria-label="Playlist options">⋮</span>'
+        + '<div class="pl-badge">' + playIcon + 'PLAYLIST</div>'
+        + '<div class="pl-count">' + inIt.length + ' video' + (inIt.length === 1 ? '' : 's') + '</div></div></div>'
+        + '<div class="card-body"><img class="card-avatar" src="' + avatarSrc + '" alt="" aria-hidden="true"><div class="card-text">'
+        + '<div class="card-title"></div><div class="card-meta"></div></div></div>';
+      card.querySelector('.card-title').textContent = pl.name;
+      const shorts = inIt.filter(p => p.format === 'short').length;
+      card.querySelector('.card-meta').textContent = inIt.length
+        ? (inIt.length - shorts) + ' long-form · ' + shorts + ' short' + (shorts === 1 ? '' : 's')
+        : 'Empty. Add videos from a video\'s ⋮ menu.';
+      card.setAttribute('aria-label', 'Open playlist ' + pl.name + ', ' + inIt.length + ' videos');
+      card.addEventListener('click', () => { openPlaylistId = pl.id; renderHome(); });
+      const menuBtn = card.querySelector('.card-menu-btn');
+      const openMenu = (e) => { e.stopPropagation(); openPlaylistActions(pl.id); };
+      menuBtn.addEventListener('click', openMenu);
+      menuBtn.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openMenu(e); } });
+      grid.appendChild(card);
+    });
+    const add = document.createElement('button');
+    add.type = 'button';
+    add.className = 'pl-card new';
+    add.style.setProperty('--i', Math.min(state.playlists.length, 10));
+    add.innerHTML = '<div class="pl-stack"><div class="card-thumb pl-front"><div class="pl-plus">+</div><div>New playlist</div></div></div>';
+    add.addEventListener('click', () => openPlaylistSheet());
+    grid.appendChild(add);
+  }
+
+  document.querySelectorAll('.home-seg-btn').forEach(b => b.addEventListener('click', () => {
+    homeView = b.dataset.view;
+    openPlaylistId = null;
+    renderHome();
+  }));
+  document.querySelectorAll('.home-format-btn').forEach(b => b.addEventListener('click', () => {
+    homeFormat = b.dataset.format;
+    try { localStorage.setItem('slate.homeFormat', homeFormat); } catch (e) {}
+    renderHome();
+  }));
+  document.getElementById('playlistHeadBack').addEventListener('click', () => { openPlaylistId = null; renderHome(); });
+  document.getElementById('playlistHeadMenu').addEventListener('click', () => { if (openPlaylistId) openPlaylistActions(openPlaylistId); });
+
+  // ---------- Playlist ⋮ menu: rename, thumbnail, duplicate, delete ----------
+  let plActionsId = null;
+  let plRenameTimer = null;
+  const plActionsBackdrop = document.getElementById('plActionsBackdrop');
+  function plActionsPlaylist() { return state.playlists.find(x => x.id === plActionsId) || null; }
+
+  function renderPlaylistActions() {
+    const pl = plActionsPlaylist();
+    if (!pl) return;
+    document.getElementById('plActionsTitle').textContent = pl.name;
+    const first = state.projects.find(p => (p.playlists || []).includes(pl.id) && p.thumbnail && p.format !== 'short');
+    const img = pl.thumbnail || (first && first.thumbnail);
+    const prev = document.getElementById('plThumbPreview');
+    prev.style.backgroundImage = img ? 'url(' + img + ')' : '';
+    document.getElementById('plThumbResetBtn').hidden = !pl.thumbnail;
+  }
+  function openPlaylistActions(id) {
+    plActionsId = id;
+    const pl = plActionsPlaylist();
+    if (!pl) return;
+    document.getElementById('plRenameInput').value = pl.name;
+    renderPlaylistActions();
+    plActionsBackdrop.classList.add('active');
+  }
+  function closePlaylistActions() {
+    clearTimeout(plRenameTimer);
+    const pl = plActionsPlaylist();
+    const name = document.getElementById('plRenameInput').value.trim();
+    if (pl && name && name !== pl.name) { pl.name = name; save(); }
+    plActionsBackdrop.classList.remove('active');
+    plActionsId = null;
+    renderHome();
+  }
+  document.getElementById('plActionsCloseBtn').addEventListener('click', closePlaylistActions);
+  plActionsBackdrop.addEventListener('click', (e) => { if (e.target === plActionsBackdrop) closePlaylistActions(); });
+  document.getElementById('plRenameInput').addEventListener('input', (e) => {
+    const pl = plActionsPlaylist();
+    const name = e.target.value.trim();
+    if (!pl || !name) return;
+    document.getElementById('plActionsTitle').textContent = name;
+    clearTimeout(plRenameTimer);
+    plRenameTimer = setTimeout(() => { pl.name = name; save(); renderHome(); }, 400);
+  });
+  document.getElementById('plRenameInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') closePlaylistActions(); });
+
+  document.getElementById('plThumbUploadBtn').addEventListener('click', () => document.getElementById('plThumbInput').click());
+  document.getElementById('plThumbInput').addEventListener('change', async (e) => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    const pl = plActionsPlaylist();
+    if (!f || !pl) return;
+    if (!f.type.startsWith('image/')) { showToast("That file isn't an image."); return; }
+    try {
+      pl.thumbnail = await imageFileToThumb(f, 480);
+      save();
+      renderPlaylistActions();
+      renderHome();
+      showToast('Playlist thumbnail updated.');
+    } catch (err) {
+      showToast("That image couldn't be opened. Try a PNG or JPG.");
+    }
+  });
+  document.getElementById('plThumbResetBtn').addEventListener('click', () => {
+    const pl = plActionsPlaylist();
+    if (!pl) return;
+    delete pl.thumbnail;
+    save();
+    renderPlaylistActions();
+    renderHome();
+  });
+
+  document.getElementById('plDuplicateBtn').addEventListener('click', () => {
+    const pl = plActionsPlaylist();
+    if (!pl) return;
+    const copy = { id: uid(), name: (pl.name + ' (copy)').slice(0, 40), createdAt: Date.now() };
+    if (pl.thumbnail) copy.thumbnail = pl.thumbnail;
+    state.playlists.splice(state.playlists.indexOf(pl) + 1, 0, copy);
+    state.projects.forEach(p => { if ((p.playlists || []).includes(pl.id)) p.playlists.push(copy.id); });
+    save();
+    plActionsBackdrop.classList.remove('active');
+    plActionsId = null;
+    renderHome();
+    showToast('Playlist duplicated: "' + copy.name + '".');
+  });
+
+  document.getElementById('plDeleteBtn').addEventListener('click', () => {
+    const pl = plActionsPlaylist();
+    if (!pl) return;
+    plActionsBackdrop.classList.remove('active');
+    showConfirm({
+      title: 'Delete "' + pl.name + '"?',
+      message: 'The videos in it stay in your projects. Only the playlist is removed.',
+      confirmLabel: 'Delete playlist',
+      onConfirm: () => {
+        state.playlists = state.playlists.filter(x => x.id !== pl.id);
+        state.projects.forEach(p => { if (Array.isArray(p.playlists)) p.playlists = p.playlists.filter(id => id !== pl.id); });
+        if (openPlaylistId === pl.id) openPlaylistId = null;
+        plActionsId = null;
+        save();
+        renderHome();
+        showToast('Playlist deleted.');
+      }
+    });
+  });
 
   // ---------- Rendering: Home ----------
   function renderHome() {
+    renderHomeViews();
     renderPlaylistChips();
     renderProjectFeed();
   }
@@ -4886,6 +5450,7 @@
   function renderPlaylistChips() {
     const row = document.getElementById('playlistChips');
     row.innerHTML = '';
+    row.hidden = homeView === 'playlists' && !openPlaylistId; // the folder list has no Active / Published
 
     const fixedChips = [
       { type: 'active', label: 'Active' },
@@ -4897,15 +5462,6 @@
       btn.className = 'chip' + (filterMode.type === c.type ? ' active' : '');
       btn.textContent = c.label;
       btn.addEventListener('click', () => { filterMode = { type: c.type }; renderPlaylistChips(); renderProjectFeed(); });
-      row.appendChild(btn);
-    });
-
-    state.playlists.forEach(pl => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'chip' + (filterMode.type === 'playlist' && filterMode.id === pl.id ? ' active' : '');
-      btn.textContent = pl.name;
-      btn.addEventListener('click', () => { filterMode = { type: 'playlist', id: pl.id }; renderPlaylistChips(); renderProjectFeed(); });
       row.appendChild(btn);
     });
   }
@@ -4971,6 +5527,17 @@
     const avatarSrc = document.querySelector('.brand-mark-img') ? document.querySelector('.brand-mark-img').src : '';
     const list = getFilteredProjects();
 
+    // Inside a playlist, "+ New video" is always first, so new videos are made without scrolling.
+    if (homeView === 'playlists' && openPlaylistId) {
+      const pl = state.playlists.find(x => x.id === openPlaylistId);
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'card pl-new-video';
+      add.innerHTML = '<div class="card-thumb"><div class="pl-plus">+</div><div>New video in this playlist</div></div>';
+      add.addEventListener('click', () => openSheet(pl ? pl.id : null));
+      grid.appendChild(add);
+    }
+
     list.forEach(p => {
       const card = document.createElement('button');
       card.type = 'button';
@@ -4989,7 +5556,7 @@
 
       card.innerHTML = `
         <div class="card-thumb" style="${thumbStyle}">
-          ${short ? '<div class="card-format-badge">SHORT</div>' : ''}
+          <div class="card-format-badge">${short ? 'SHORT' : 'LONG'}</div>
           ${showThumb ? '' : '<div class="card-thumb-icon" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="7" y1="6" x2="7" y2="18"/><line x1="17" y1="6" x2="17" y2="18"/><line x1="2" y1="10" x2="7" y2="10"/><line x1="2" y1="14" x2="7" y2="14"/><line x1="17" y1="10" x2="22" y2="10"/><line x1="17" y1="14" x2="22" y2="14"/></svg></div>'}
           ${p.published ? '<div class="card-published-badge">Published</div>' : ''}
           <button type="button" class="card-menu-btn" aria-label="Project options">⋮</button>
@@ -5011,10 +5578,12 @@
       grid.appendChild(card);
     });
 
-    if (list.length === 0 && state.projects.length > 0 && filterMode.type !== 'published') {
+    if (list.length === 0 && state.projects.length > 0 && filterMode.type !== 'published' && !openPlaylistId) {
       const empty = document.createElement('div');
       empty.className = 'empty-home';
-      empty.textContent = 'Nothing matches here yet.';
+      empty.textContent = homeView === 'playlists' && openPlaylistId
+        ? (homeFormat === 'all' ? 'No videos in this playlist yet. Add one from a video\'s ⋮ menu.' : 'No ' + (homeFormat === 'short' ? 'Shorts' : 'long-form videos') + ' in this playlist.')
+        : homeFormat !== 'all' ? 'No ' + (homeFormat === 'short' ? 'Shorts' : 'long-form videos') + ' here yet.' : 'Nothing matches here yet.';
       grid.appendChild(empty);
     }
   }
@@ -5147,28 +5716,102 @@
     if (!p) return;
     document.getElementById('actionsProjectName').textContent = (p.title && p.title.trim()) ? p.title : p.name;
     document.getElementById('actionsPublishBtn').textContent = p.published ? 'Move back to Active' : 'Mark as Published';
+    document.getElementById('actionsAddReminderBtn').textContent = p.appleReminderId ? 'Update in Reminders' : 'Add to Reminders';
     document.getElementById('actionsScheduledDate').value = p.scheduledDate || '';
 
     const container = document.getElementById('actionsPlaylistList');
-    container.innerHTML = '';
-    if (state.playlists.length === 0) {
-      container.innerHTML = '<div class="empty-tab" style="margin:4px 0 8px; padding:0;">No playlists yet. Make one from the home screen.</div>';
-    } else {
-      state.playlists.forEach(pl => {
-        const row = document.createElement('button');
-        row.type = 'button';
-        row.className = 'playlist-check-row';
-        const checked = p.playlists.includes(pl.id);
-        row.innerHTML = `<span class="playlist-check-box${checked ? ' checked' : ''}">${checked ? '✓' : ''}</span><span>${escapeHtml(pl.name)}</span>`;
-        row.addEventListener('click', () => {
-          toggleProjectPlaylist(p.id, pl.id);
-          renderActionsSheetContent();
-        });
-        container.appendChild(row);
-      });
-    }
+    const inLists = state.playlists.filter(pl => p.playlists.includes(pl.id));
+    container.innerHTML = inLists.length
+      ? 'In ' + inLists.map(pl => '<b>' + escapeHtml(pl.name) + '</b>').join(', ')
+      : 'Not in a playlist yet.';
+    document.getElementById('actionsSaveToPlBtn').textContent = inLists.length ? 'Change playlists' : 'Add to playlist';
   }
 
+  // ---------- "Save to playlist" (like YouTube): tap a playlist to add or remove this video ----------
+  let saveToPlProjectId = null;
+  const saveToPlBackdrop = document.getElementById('saveToPlBackdrop');
+  const BOOKMARK_ON = '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+  const BOOKMARK_OFF = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
+
+  function playlistCover(pl) {
+    if (pl.thumbnail) return pl.thumbnail;
+    const first = state.projects.find(p => (p.playlists || []).includes(pl.id) && p.thumbnail && p.format !== 'short');
+    return first ? first.thumbnail : null;
+  }
+  function renderSaveToPl(popId) {
+    const p = findProject(saveToPlProjectId);
+    if (!p) return;
+    document.getElementById('saveToPlVideo').textContent = (p.title && p.title.trim()) ? p.title : p.name;
+    const list = document.getElementById('saveToPlList');
+    list.innerHTML = state.playlists.length ? '' : '<div class="empty-tab" style="margin:0 0 6px; padding:0;">No playlists yet. Make your first one below.</div>';
+    state.playlists.forEach(pl => {
+      const saved = p.playlists.includes(pl.id);
+      const n = state.projects.filter(x => (x.playlists || []).includes(pl.id)).length;
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'save-pl-row' + (saved ? ' saved' : '') + (popId === pl.id ? ' pop' : '');
+      row.setAttribute('aria-pressed', String(saved));
+      const cover = playlistCover(pl);
+      row.innerHTML = '<span class="save-pl-cover"' + (cover ? ' style="background-image:url(' + cover + ')"' : '') + '></span>'
+        + '<span class="save-pl-text"><span class="save-pl-name"></span><span class="save-pl-count" style="display:block">' + n + ' video' + (n === 1 ? '' : 's') + '</span></span>'
+        + '<span class="save-pl-mark" aria-hidden="true">' + (saved ? BOOKMARK_ON : BOOKMARK_OFF) + '</span>';
+      row.querySelector('.save-pl-name').textContent = pl.name;
+      row.addEventListener('click', () => {
+        toggleProjectPlaylist(p.id, pl.id);
+        const nowSaved = p.playlists.includes(pl.id);
+        showToast((nowSaved ? 'Saved to ' : 'Removed from ') + pl.name);
+        renderSaveToPl(pl.id);
+      });
+      list.appendChild(row);
+    });
+  }
+  function openSaveToPlaylist(projectId) {
+    saveToPlProjectId = projectId;
+    document.getElementById('saveToPlCreate').hidden = true;
+    document.getElementById('saveToPlNewBtn').hidden = false;
+    renderSaveToPl();
+    saveToPlBackdrop.classList.add('active');
+  }
+  function closeSaveToPlaylist() { saveToPlBackdrop.classList.remove('active'); saveToPlProjectId = null; renderHome(); }
+  document.getElementById('saveToPlDoneBtn').addEventListener('click', closeSaveToPlaylist);
+  saveToPlBackdrop.addEventListener('click', (e) => { if (e.target === saveToPlBackdrop) closeSaveToPlaylist(); });
+  document.getElementById('saveToPlNewBtn').addEventListener('click', () => {
+    document.getElementById('saveToPlNewBtn').hidden = true;
+    document.getElementById('saveToPlCreate').hidden = false;
+    const input = document.getElementById('saveToPlNewName');
+    input.value = '';
+    document.getElementById('saveToPlCreateBtn').disabled = true;
+    setTimeout(() => input.focus(), 50);
+  });
+  document.getElementById('saveToPlNewName').addEventListener('input', (e) => {
+    document.getElementById('saveToPlCreateBtn').disabled = !e.target.value.trim();
+  });
+  const createAndSave = () => {
+    const name = document.getElementById('saveToPlNewName').value.trim();
+    const p = findProject(saveToPlProjectId);
+    if (!name || !p) return;
+    const pl = { id: uid(), name, createdAt: Date.now() };
+    state.playlists.push(pl);
+    p.playlists.push(pl.id);
+    save();
+    document.getElementById('saveToPlCreate').hidden = true;
+    document.getElementById('saveToPlNewBtn').hidden = false;
+    showToast('Saved to ' + name);
+    renderSaveToPl(pl.id);
+  };
+  document.getElementById('saveToPlCreateBtn').addEventListener('click', createAndSave);
+  document.getElementById('saveToPlNewName').addEventListener('keydown', (e) => { if (e.key === 'Enter') createAndSave(); });
+  document.getElementById('actionsSaveToPlBtn').addEventListener('click', () => {
+    const id = actionsProjectId;
+    if (!id) return;
+    closeActionsSheet();
+    openSaveToPlaylist(id);
+  });
+
+  document.getElementById('actionsAddReminderBtn').addEventListener('click', () => {
+    const p = findProject(actionsProjectId);
+    if (p) addToAppleReminders(p);
+  });
   document.getElementById('actionsDuplicateBtn').addEventListener('click', () => {
     if (!actionsProjectId) return;
     duplicateProject(actionsProjectId);
@@ -5217,7 +5860,7 @@
     state.playlists.push({ id: uid(), name, createdAt: Date.now() });
     save();
     closePlaylistSheet();
-    renderPlaylistChips();
+    renderHome();
   });
 
   // ---------- Account sheet: avatar, sign in/out, backup ----------
@@ -5629,7 +6272,16 @@
     const shown = !settingsDraft.leaderboardHidden;
     sw.classList.toggle('on', shown);
     sw.setAttribute('aria-pressed', String(shown));
+    const link = document.getElementById('settingsChannelLinkSwitch');
+    link.classList.toggle('on', !!settingsDraft.shareChannelLink);
+    link.setAttribute('aria-pressed', String(!!settingsDraft.shareChannelLink));
   }
+  document.getElementById('settingsChannelLinkSwitch').addEventListener('click', () => {
+    settingsDraft.shareChannelLink = !settingsDraft.shareChannelLink;
+    if (settingsDraft.shareChannelLink && !(state.profile.channelUrl || '').trim()) showToast('Add your channel link in Edit profile first, so it can show.');
+    renderLeaderboardSwitch();
+    markSettingsDirty();
+  });
   document.getElementById('settingsLeaderboardSwitch').addEventListener('click', () => {
     settingsDraft.leaderboardHidden = !settingsDraft.leaderboardHidden;
     renderLeaderboardSwitch();
@@ -5679,7 +6331,13 @@
       const score = week ? you.weeklyXp : you.xp;
       youBox.innerHTML = '<div class="lb-you"><div class="lb-you-rank">' + (you.hidden ? '–' : rank ? '#' + rank : '–') + '</div>'
         + '<div class="lb-you-text"><div class="lb-you-title">' + (you.hidden ? 'You\'re hidden from the leaderboard' : week && !score ? 'Earn XP this week to get on the board' : 'Your rank') + '</div>'
-        + '<div class="lb-you-sub">' + (you.hidden ? 'Turn it on in Settings to appear. ' : '') + 'Level ' + you.level + ' · ' + score.toLocaleString() + ' XP' + (week ? ' this week' : '') + '</div></div></div>';
+        + '<div class="lb-you-sub">' + (you.hidden ? 'Turn it on in Settings to appear. ' : '') + 'Level ' + you.level + ' · ' + score.toLocaleString() + ' XP' + (week ? ' this week' : '') + '</div></div>'
+        + '<div class="lb-you-view">View profile ›</div></div>';
+      const box = youBox.querySelector('.lb-you');
+      box.classList.add('clickable');
+      box.setAttribute('role', 'button');
+      box.tabIndex = 0;
+      box.addEventListener('click', () => openLbProfile(ownProfileRow()));
     } else {
       youBox.innerHTML = '';
     }
@@ -5687,16 +6345,98 @@
     if (!rows.length) {
       list.innerHTML = '<div class="empty-tab">' + (week ? 'Nobody has earned XP yet this week. Be the first!' : 'No one on the leaderboard yet.') + '</div>';
     } else {
-      list.innerHTML = rows.map(r => '<div class="lb-row' + (r.you ? ' you' : '') + '">'
+      list.innerHTML = rows.map((r, i) => '<button type="button" class="lb-row' + (r.you ? ' you' : '') + '" data-lb-index="' + i + '" aria-label="View ' + escapeHtml(r.name) + '\'s profile">'
         + '<div class="lb-rank' + (r.rank <= 3 ? ' r' + r.rank : '') + '">' + r.rank + '</div>'
-        + '<div class="lb-avatar" aria-hidden="true">' + escapeHtml((r.name || '?').charAt(0).toUpperCase()) + '</div>'
+        + '<div class="lb-avatar" aria-hidden="true">' + (lbAvatarOk(r.avatar) ? '<img src="' + r.avatar + '" alt="">' : escapeHtml((r.name || '?').charAt(0).toUpperCase())) + '</div>'
         + '<div class="lb-name"><div class="lb-name-line"><span class="lb-name-text">' + escapeHtml(r.name) + (r.you ? ' (you)' : '') + '</span>' + badgeHtml(r.badges) + '</div>'
         + '<div class="lb-level">Level ' + r.level + '</div></div>'
         + '<div class="lb-score"><div class="lb-score-num">' + (week ? r.weeklyXp : r.xp).toLocaleString() + '</div><div class="lb-score-label">XP</div></div>'
-        + '</div>').join('');
+        + '</button>').join('');
+      list.querySelectorAll('[data-lb-index]').forEach(btn => btn.addEventListener('click', () => openLbProfile(rows[+btn.dataset.lbIndex])));
     }
-    note.textContent = 'Earn XP by capturing ideas, finishing your daily tasks and planning videos. Only your creator name, level and badges are shown. You can hide yourself in Settings.';
+    note.textContent = 'Earn XP by capturing ideas, finishing your daily tasks and planning videos. Tap anyone to see their profile. Only creator names, levels, XP and badges are shown (plus a channel link if someone turns it on). You can hide yourself in Settings.';
   }
+
+  // Profile card for one leaderboard row. The same person is found on the other board by their
+  // public id, so both ranks show (a rank only exists while they're in that board's top 50).
+  const LB_COLORS = ['#5865F2', '#EB459E', '#57F287', '#FEE75C', '#ED4245', '#9B59B6', '#1ABC9C', '#E67E22'];
+  function lbColor(name) { let n = 0; for (const ch of String(name)) n = (n * 31 + ch.charCodeAt(0)) >>> 0; return LB_COLORS[n % LB_COLORS.length]; }
+
+  function lbAvatarOk(src) { return typeof src === 'string' && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(src); }
+
+  // Your own card, from your Edit-profile details (plus your ranks if the leaderboard has loaded).
+  function ownProfileRow() {
+    const d = lbData && !lbData.error ? lbData : null;
+    const you = d && d.you ? d.you : null;
+    const xp = Math.max(0, state.profile.xp || 0);
+    return {
+      you: true, pid: you ? you.pid : null,
+      name: (state.profile.channelName || '').trim() || (you && you.name) || 'You',
+      level: levelFromXp(xp), xp, weeklyXp: you ? you.weeklyXp : 0,
+      badges: memberBadges().map(b => b.key),
+      bio: (state.profile.bio || '').trim(),
+      avatar: state.profile.avatarSmall || state.profile.profilePicture || '',
+      joinedAt: you ? you.joinedAt : null,
+      channelUrl: (() => {
+        const u = (state.profile.channelUrl || '').trim();
+        if (!state.profile.shareChannelLink || !u) return '';
+        return /^https?:///i.test(u) ? u : 'https://' + u;
+      })()
+    };
+  }
+
+  function openLbProfile(row) {
+    if (!row) return;
+    const data = lbData && !lbData.error ? lbData : { allTime: [], week: [], you: null };
+    const all = (data.allTime || []).find(r => r.pid && r.pid === row.pid);
+    const wk = (data.week || []).find(r => r.pid && r.pid === row.pid);
+    const rankAll = all ? all.rank : (row.you && data.you ? data.you.rankAllTime : null);
+    const rankWeek = wk ? wk.rank : (row.you && data.you ? data.you.rankWeek : null);
+    const level = row.level;
+    const floor = xpForLevel(level), next = xpForLevel(level + 1);
+    const pct = Math.max(3, Math.min(100, Math.round((row.xp - floor) / (next - floor) * 100)));
+    const joined = row.joinedAt ? new Date(row.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) : null;
+    const color = lbColor(row.name);
+    const card = document.getElementById('lbProfileCard');
+    card.style.setProperty('--lbp-color', color);
+    const badgeCards = (row.badges || []).map(k => {
+      const b = BADGES.find(x => x.key === k);
+      if (!b) return '';
+      const icon = k === 'founder' ? '<span class="lbp-badge-emoji">👑</span>' : b.image ? '<img src="' + b.image + '" alt="">' : '';
+      return '<div class="lbp-badge">' + icon + escapeHtml(b.label) + '</div>';
+    }).join('');
+    const stat = (num, label) => '<div class="lbp-stat"><div class="lbp-stat-num">' + num + '</div><div class="lbp-stat-label">' + label + '</div></div>';
+    card.innerHTML = '<div class="lbp-banner"></div>'
+      + '<button type="button" class="lbp-close" id="lbpClose" aria-label="Close"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>'
+      + '<div class="lbp-body">'
+      + '<div class="lbp-avatar" aria-hidden="true">' + (lbAvatarOk(row.avatar) ? '<img src="' + row.avatar + '" alt="">' : escapeHtml((row.name || '?').charAt(0).toUpperCase())) + '</div>'
+      + '<div class="lbp-name-row"><span class="lbp-name" id="lbpName">' + escapeHtml(row.name) + '</span>' + (row.you ? '<span class="lbp-you">You</span>' : '') + '</div>'
+      + '<div class="lbp-sub">' + (joined ? 'Joined ' + escapeHtml(joined) : 'CreativeFlow member') + '</div>'
+      + (row.bio ? '<div class="lbp-bio">' + escapeHtml(row.bio) + '</div>' : (row.you ? '<div class="lbp-bio" style="color:#A6A3B3">Add a bio in Edit profile.</div>' : ''))
+      + '<div class="lbp-level"><div class="lbp-level-top"><b>Level ' + level + '</b><span>' + (row.xp - floor).toLocaleString() + ' / ' + (next - floor).toLocaleString() + ' XP to level ' + (level + 1) + '</span></div>'
+      + '<div class="lbp-bar"><i id="lbpBar"></i></div></div>'
+      + '<div class="lbp-stats">'
+      + stat(row.xp.toLocaleString(), 'Total XP')
+      + stat(row.weeklyXp.toLocaleString(), 'XP this week')
+      + stat(rankAll ? '#' + rankAll : '–', 'All-time rank')
+      + stat(rankWeek ? '#' + rankWeek : '–', "This week's rank")
+      + '</div>'
+      + (badgeCards ? '<div class="lbp-section">Badges</div><div class="lbp-badges">' + badgeCards + '</div>' : '')
+      + (row.channelUrl && /^https?:\/\//i.test(row.channelUrl)
+        ? '<a class="lbp-link" href="' + escapeHtml(row.channelUrl) + '" target="_blank" rel="noopener noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>Visit channel</a>'
+        : '')
+      + '</div>';
+    const backdrop = document.getElementById('lbProfile');
+    backdrop.hidden = false;
+    document.getElementById('lbpClose').addEventListener('click', closeLbProfile);
+    requestAnimationFrame(() => requestAnimationFrame(() => { document.getElementById('lbpBar').style.width = pct + '%'; }));
+    document.getElementById('lbpClose').focus();
+  }
+  function closeLbProfile() { document.getElementById('lbProfile').hidden = true; }
+  document.getElementById('lbProfile').addEventListener('click', (e) => { if (e.target.id === 'lbProfile') closeLbProfile(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !document.getElementById('lbProfile').hidden) closeLbProfile(); });
+
+  document.getElementById('editProfileViewBtn').addEventListener('click', () => openLbProfile(ownProfileRow()));
 
   async function loadLeaderboard() {
     lbData = null;
@@ -5734,12 +6474,15 @@
       aiResponseStyle: state.profile.aiResponseStyle,
       enabledFeatures: state.profile.enabledFeatures.slice(),
       leaderboardHidden: state.profile.leaderboardHidden === true,
+      shareChannelLink: state.profile.shareChannelLink === true,
+      reminders: normalizeReminders(state.profile.reminders),
       customization: JSON.parse(JSON.stringify(normalizeCustomization(state.profile.customization)))
     };
     renderSettingsAiStyle();
     renderSettingsFeatureToggles();
     renderCustomizeSection();
     renderLeaderboardSwitch();
+    renderReminderSettings();
     document.getElementById('settingsSaveBtn').disabled = true;
     switchScreen('settings');
   }
@@ -5770,6 +6513,8 @@
     state.profile.enabledFeatures = settingsDraft.enabledFeatures;
     state.profile.customization = settingsDraft.customization;
     state.profile.leaderboardHidden = settingsDraft.leaderboardHidden;
+    state.profile.shareChannelLink = settingsDraft.shareChannelLink === true;
+    state.profile.reminders = normalizeReminders(settingsDraft.reminders);
     save();
     applyCustomization();
     settingsDraft = null;
@@ -6184,7 +6929,9 @@
     b.addEventListener('click', () => { selectedFormat = b.dataset.format; renderFormatToggle(); });
   });
 
-  function openSheet() {
+  let newProjectPlaylistId = null; // set when "+ New video" is used inside a playlist
+  function openSheet(playlistId) {
+    newProjectPlaylistId = typeof playlistId === 'string' ? playlistId : null;
     newProjName.value = '';
     selectedColor = COLORS[state.projects.length % COLORS.length];
     selectedFormat = 'long';
@@ -6205,12 +6952,15 @@
   sheetCreate.addEventListener('click', () => {
     const name = newProjName.value.trim();
     if (!name) return;
-    const p = { id: uid(), name, color: selectedColor, format: selectedFormat, ideas: [], script: '', title: '', thumbnail: null, published: false, playlists: [], scheduledDate: '', createdAt: Date.now() };
+    const inPlaylist = newProjectPlaylistId && state.playlists.find(x => x.id === newProjectPlaylistId);
+    const p = { id: uid(), name, color: selectedColor, format: selectedFormat, ideas: [], script: '', title: '', thumbnail: null, published: false, playlists: inPlaylist ? [inPlaylist.id] : [], scheduledDate: '', createdAt: Date.now() };
     state.projects.unshift(p);
     save();
     recordUsage('projectsCreated');
     closeSheet();
+    newProjectPlaylistId = null;
     renderHome();
+    if (inPlaylist) showToast('Added to ' + inPlaylist.name + ' (and your projects).');
   });
 
   // ---------- Project detail ----------
@@ -6809,6 +7559,190 @@
     zip.file('word/document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paras}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`);
     return zip.generateAsync({ type: 'blob', mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
   }
+
+  // ---------- Reminders for scheduled videos (iPhone app) ----------
+  // Uses the phone's own scheduled notifications (no server): whenever data is saved, every
+  // reminder is worked out again from the videos' scheduled dates. iOS keeps at most 64, so
+  // only the soonest are scheduled. Settings sync between devices; only the iPhone app notifies.
+  var reminderTimer = null;
+  function normalizeReminders(r) {
+    r = r && typeof r === 'object' ? r : {};
+    const offsets = Array.isArray(r.offsets) ? r.offsets.filter(n => [0, 1, 3, 7].includes(n)) : [3, 1, 0];
+    return { on: r.on === true, offsets: offsets.length ? offsets : [1], time: /^\d{2}:\d{2}$/.test(r.time || '') ? r.time : '09:00' };
+  }
+  function notificationsApi() {
+    return document.documentElement.classList.contains('ios-app') && window.Capacitor && window.Capacitor.Plugins
+      ? window.Capacitor.Plugins.LocalNotifications || null : null;
+  }
+  function scheduleRemindersSoon() {
+    if (!notificationsApi()) return;
+    clearTimeout(reminderTimer);
+    reminderTimer = setTimeout(scheduleReminders, 1500);
+  }
+  function reminderText(p, daysLeft) {
+    const name = (p.title && p.title.trim()) || p.name;
+    const words = scriptPlainText(p.script).split(/\s+/).filter(Boolean).length;
+    const next = !words ? 'Start the script.'
+      : words < (p.format === 'short' ? 25 : 60) ? 'Finish the script.'
+      : p.format !== 'short' && !p.thumbnail ? 'The thumbnail is still to do.'
+      : !(p.title || '').trim() ? 'Pick a title.'
+      : 'Almost there. Give it a last look.';
+    const when = daysLeft === 0 ? 'Upload day!' : daysLeft === 1 ? 'Due tomorrow.' : daysLeft === 7 ? 'Due in a week.' : 'Due in ' + daysLeft + ' days.';
+    return { title: '📅 ' + name, body: when + ' ' + next };
+  }
+  function reminderId(projectId, offset) {
+    let n = 0;
+    for (const ch of projectId + ':' + offset) n = (n * 31 + ch.charCodeAt(0)) | 0;
+    return Math.abs(n) % 2000000000;
+  }
+  async function scheduleReminders() {
+    const api = notificationsApi();
+    if (!api) return;
+    try {
+      const pending = await api.getPending();
+      if (pending && pending.notifications && pending.notifications.length) {
+        await api.cancel({ notifications: pending.notifications.map(n => ({ id: n.id })) });
+      }
+      const r = normalizeReminders(state.profile.reminders);
+      if (!r.on) return;
+      const perm = await api.checkPermissions();
+      if (!perm || perm.display !== 'granted') return;
+      const [hh, mm] = r.time.split(':').map(Number);
+      const now = Date.now();
+      const list = [];
+      state.projects.forEach(p => {
+        if (p.published || !/^\d{4}-\d{2}-\d{2}$/.test(p.scheduledDate || '')) return;
+        const [y, mo, d] = p.scheduledDate.split('-').map(Number);
+        r.offsets.forEach(off => {
+          const at = new Date(y, mo - 1, d - off, hh, mm, 0, 0);
+          if (at.getTime() <= now + 60000) return;
+          const t = reminderText(p, off);
+          list.push({ id: reminderId(p.id, off), title: t.title, body: t.body, schedule: { at, allowWhileIdle: true }, extra: { projectId: p.id } });
+        });
+      });
+      list.sort((a, b) => a.schedule.at - b.schedule.at);
+      if (list.length) await api.schedule({ notifications: list.slice(0, 60) });
+    } catch (e) {
+      console.error('CreativeFlow: scheduling reminders failed', e);
+    }
+  }
+  // Tapping a reminder opens that video.
+  (function listenForReminderTaps() {
+    const api = notificationsApi();
+    if (!api) return;
+    // The first time the app opens, iPhone's own "Allow notifications?" box appears. Saying Allow
+    // also switches on reminders (3 days before, 1 day before and on the day, at 9:00).
+    setTimeout(async () => {
+      try {
+        const perm = await api.checkPermissions();
+        if (!perm || !/^prompt/.test(perm.display)) return;
+        const res = await api.requestPermissions();
+        if (res && res.display === 'granted' && !(state.profile.reminders && state.profile.reminders.on)) {
+          state.profile.reminders = normalizeReminders({ on: true, offsets: [3, 1, 0], time: '09:00' });
+          save();
+          showToast('Reminders are on. Change them in Settings → Reminders.');
+        }
+      } catch (e) { console.error('CreativeFlow: notification permission failed', e); }
+    }, 1800);
+    api.addListener('localNotificationActionPerformed', (ev) => {
+      const id = ev && ev.notification && ev.notification.extra && ev.notification.extra.projectId;
+      if (id && findProject(id)) setTimeout(() => openProject(id), 300);
+    });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleRemindersSoon(); });
+    scheduleRemindersSoon();
+  })();
+
+  // ---------- "Add to Reminders": puts a video into Apple's Reminders app (iPhone app) ----------
+  // The reminder goes in a "CreativeFlow" list, due on the video's scheduled date (at the reminder
+  // time from Settings). Adding again replaces the old one instead of making a copy.
+  function appleRemindersApi() {
+    return document.documentElement.classList.contains('ios-app') && window.Capacitor && window.Capacitor.Plugins
+      ? window.Capacitor.Plugins.CapacitorCalendar || null : null;
+  }
+  async function addToAppleReminders(p) {
+    const cal = appleRemindersApi();
+    if (!cal) { showToast('Add to Reminders works in the iPhone app.'); return; }
+    try {
+      const access = await cal.requestFullRemindersAccess();
+      if (!access || access.result !== 'granted') {
+        showToast('CreativeFlow can\'t use Reminders. Turn it on in iPhone Settings → CreativeFlow → Reminders.');
+        return;
+      }
+      const lists = ((await cal.getRemindersLists()) || {}).result || [];
+      let list = lists.find(l => l && l.title === 'CreativeFlow');
+      if (!list) {
+        const made = await cal.createRemindersList({ title: 'CreativeFlow', color: '#8358FF' });
+        list = { id: made.id };
+      }
+      if (p.appleReminderId) {
+        try { await cal.deleteRemindersById({ ids: [p.appleReminderId] }); } catch (e) {}
+      }
+      const name = (p.title && p.title.trim()) || p.name;
+      const r = normalizeReminders(state.profile.reminders);
+      const [hh, mm] = r.time.split(':').map(Number);
+      const opts = { title: name, listId: list.id, notes: 'From CreativeFlow' + (p.format === 'short' ? ' · Short' : '') };
+      if (/^\d{4}-\d{2}-\d{2}$/.test(p.scheduledDate || '')) {
+        const [y, mo, d] = p.scheduledDate.split('-').map(Number);
+        opts.dueDate = new Date(y, mo - 1, d, hh, mm).getTime();
+        opts.alerts = [0];
+      }
+      const made = await cal.createReminder(opts);
+      p.appleReminderId = made && made.id ? made.id : null;
+      save();
+      showToast(opts.dueDate ? 'Added to Reminders, due ' + new Date(opts.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + '.' : 'Added to Reminders. Give it a scheduled date to add a due date.');
+    } catch (e) {
+      console.error('CreativeFlow: Add to Reminders failed', e);
+      showToast("Couldn't add it to Reminders.");
+    }
+  }
+
+  function renderReminderSettings() {
+    if (!settingsDraft) return;
+    const r = settingsDraft.reminders;
+    const sw = document.getElementById('settingsRemindersSwitch');
+    sw.classList.toggle('on', r.on);
+    sw.setAttribute('aria-pressed', String(r.on));
+    document.getElementById('reminderOptions').hidden = !r.on;
+    document.querySelectorAll('#reminderOffsets .reminder-chip').forEach(c => c.setAttribute('aria-pressed', String(r.offsets.includes(+c.dataset.offset))));
+    document.getElementById('reminderTime').value = r.time;
+  }
+  document.getElementById('settingsRemindersSwitch').addEventListener('click', async () => {
+    const r = settingsDraft.reminders;
+    if (!r.on) {
+      const api = notificationsApi();
+      if (!api) { showToast('Reminders work in the iPhone app.'); return; }
+      try {
+        let perm = await api.checkPermissions();
+        if (perm.display !== 'granted') perm = await api.requestPermissions();
+        if (perm.display !== 'granted') { showToast('Notifications are off for CreativeFlow. Turn them on in iPhone Settings → CreativeFlow → Notifications.'); return; }
+      } catch (e) { showToast("Couldn't turn on notifications."); return; }
+    }
+    r.on = !r.on;
+    renderReminderSettings();
+    markSettingsDirty();
+  });
+  document.querySelectorAll('#reminderOffsets .reminder-chip').forEach(c => c.addEventListener('click', () => {
+    const r = settingsDraft.reminders;
+    const off = +c.dataset.offset;
+    r.offsets = r.offsets.includes(off) ? r.offsets.filter(x => x !== off) : r.offsets.concat(off);
+    if (!r.offsets.length) r.offsets = [off]; // keep at least one
+    renderReminderSettings();
+    markSettingsDirty();
+  }));
+  document.getElementById('reminderTime').addEventListener('change', (e) => {
+    if (/^\d{2}:\d{2}$/.test(e.target.value)) { settingsDraft.reminders.time = e.target.value; markSettingsDirty(); }
+  });
+  document.getElementById('reminderTestBtn').addEventListener('click', async () => {
+    const api = notificationsApi();
+    if (!api) return;
+    try {
+      let perm = await api.checkPermissions();
+      if (perm.display !== 'granted') perm = await api.requestPermissions();
+      if (perm.display !== 'granted') { showToast('Notifications are off for CreativeFlow in iPhone Settings.'); return; }
+      await api.schedule({ notifications: [{ id: 1999999999, title: '📅 CreativeFlow reminder', body: 'This is what a reminder looks like. Lock your phone to see it.', schedule: { at: new Date(Date.now() + 5000) } }] });
+      showToast('Test notification in 5 seconds. Lock your phone or go to the home screen.');
+    } catch (e) { showToast("Couldn't send a test notification."); }
+  });
 
   function setWriteSaved(done) {
     const el = document.getElementById('writeSaved');
@@ -8001,6 +8935,14 @@
     document.getElementById('panel-ai').classList.toggle('active', name === 'ai');
   }
 
+  (function measureTabBar() {
+    const bar = document.getElementById('tabBar');
+    if (!bar || !window.ResizeObserver) return;
+    const set = () => { if (bar.offsetHeight) document.documentElement.style.setProperty('--tabbar-h', bar.offsetHeight + 'px'); };
+    new ResizeObserver(set).observe(bar);
+    set();
+  })();
+
   let plannerUnderlay = null; // the screen shown blurred behind the planner
   function switchScreen(name) {
     // Everything past sign-in needs an active membership; send the user to the license screen instead.
@@ -8324,8 +9266,47 @@
     }
   }
 
+  // Turns Adonis's Markdown (bold, italics, lists, headings, code) into safe HTML: everything is
+  // escaped first, so a reply can't add its own HTML.
+  function aiMarkdown(src) {
+    const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const inline = (s) => esc(s)
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*([^*]+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__([^_]+?)__/g, '<strong>$1</strong>')
+      .replace(/(^|[^*\w])\*([^*\n]+?)\*(?!\w)/g, '$1<em>$2</em>')
+      .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+    const lines = String(src || '').replace(/\r\n?/g, '\n').split('\n');
+    let html = '', list = null, para = [], code = null;
+    const flushPara = () => { if (para.length) { html += '<p>' + para.map(inline).join('<br>') + '</p>'; para = []; } };
+    const closeList = () => { if (list) { html += '</' + list + '>'; list = null; } };
+    for (const line of lines) {
+      if (code !== null) {
+        if (/^\s*```/.test(line)) { html += '<pre><code>' + esc(code.join('\n')) + '</code></pre>'; code = null; }
+        else code.push(line);
+        continue;
+      }
+      if (/^\s*```/.test(line)) { flushPara(); closeList(); code = []; continue; }
+      let m;
+      if ((m = line.match(/^\s*(#{1,6})\s+(.*)$/))) { flushPara(); closeList(); html += '<h3>' + inline(m[2]) + '</h3>'; continue; }
+      if (/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(line)) { flushPara(); closeList(); html += '<hr>'; continue; }
+      if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) { flushPara(); if (list !== 'ul') { closeList(); html += '<ul>'; list = 'ul'; } html += '<li>' + inline(m[1]) + '</li>'; continue; }
+      if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { flushPara(); if (list !== 'ol') { closeList(); html += '<ol>'; list = 'ol'; } html += '<li>' + inline(m[1]) + '</li>'; continue; }
+      if (!line.trim()) { flushPara(); closeList(); continue; }
+      closeList();
+      para.push(line);
+    }
+    if (code !== null) html += '<pre><code>' + esc(code.join('\n')) + '</code></pre>';
+    flushPara(); closeList();
+    return html;
+  }
+
   function renderAiMessages() {
     const turns = state.aiChats[aiChatKey()] || [];
+    // Stay where the person is reading: only follow new text if they were already at the bottom.
+    const wasEmpty = !aiChatList.querySelector('.ai-bubble');
+    const nearBottom = aiChatList.scrollHeight - aiChatList.scrollTop - aiChatList.clientHeight < 120;
+    const keepScroll = aiChatList.scrollTop;
     aiChatList.innerHTML = '';
     if (turns.length === 0) {
       const wrap = document.createElement('div');
@@ -8381,13 +9362,21 @@
             bubble.appendChild(imgRow);
           }
           const textNode = document.createElement('div');
-          textNode.textContent = t.content;
+          if (t.role === 'assistant' && !t.isError) {
+            bubble.classList.add('md');
+            textNode.className = 'ai-md';
+            textNode.innerHTML = aiMarkdown(t.content);
+          } else {
+            textNode.textContent = t.content;
+          }
           bubble.appendChild(textNode);
         }
         aiChatList.appendChild(bubble);
       });
     }
-    aiChatList.scrollTop = aiChatList.scrollHeight;
+    const last = turns[turns.length - 1];
+    const justSent = last && (last.role === 'user' || (last.role === 'assistant' && last.content === ''));
+    aiChatList.scrollTop = (wasEmpty || nearBottom || justSent) ? aiChatList.scrollHeight : keepScroll;
   }
 
   function buildCreatorProfileContext() {
@@ -9939,7 +10928,86 @@ Give concise, specific, practical feedback grounded in the material above when a
     msg.textContent = text;
   }
 
+  // ---------- Google / Apple sign-in in the apps ----------
+  // Google and Apple refuse to sign in inside an app's own window, so the apps open the sign-in in
+  // the normal browser (desktop) or Safari's sign-in sheet (iPhone). When it's done, the browser
+  // comes back to the app (desktop: the app's local address; iPhone: the app's own link), and the
+  // app finishes the sign-in with the one-time code Clerk added. This is how Clerk's mobile SDKs
+  // do it; both return addresses must be on Clerk's "Allowlist for mobile SSO redirect".
+  const IS_IOS_APP = document.documentElement.classList.contains('ios-app');
+  const NATIVE_SSO_REDIRECT = IS_IOS_APP ? 'com.creativeminds.creativeflow://oauth-callback' : 'http://127.0.0.1:47831/oauth-callback';
+  let nativeSsoWaiting = null; // { resolve, reject } while waiting for the browser to come back
+
+  function nativeSsoCallback(url) {
+    if (!nativeSsoWaiting || !String(url).includes('oauth-callback')) return;
+    const w = nativeSsoWaiting;
+    nativeSsoWaiting = null;
+    w.resolve(url);
+  }
+  if (desktopAppBridge() && desktopAppBridge().onOAuthCallback) desktopAppBridge().onOAuthCallback(nativeSsoCallback);
+  if (IS_IOS_APP && window.Capacitor.Plugins && window.Capacitor.Plugins.App) {
+    window.Capacitor.Plugins.App.addListener('appUrlOpen', ({ url }) => {
+      if (String(url).startsWith('com.creativeminds.creativeflow://')) {
+        try { window.Capacitor.Plugins.Browser.close(); } catch (e) {}
+        nativeSsoCallback(url);
+      }
+    });
+  }
+  function desktopAppBridge() { return window.creativeflowDesktop || null; }
+
+  function setNativeSsoStatus(text, withCancel) {
+    const el = document.getElementById('nativeSsoStatus');
+    el.hidden = !text;
+    el.textContent = text || '';
+    if (withCancel) {
+      el.append(' ');
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = 'Cancel';
+      b.addEventListener('click', () => { if (nativeSsoWaiting) { const w = nativeSsoWaiting; nativeSsoWaiting = null; w.reject(new Error('cancelled')); } });
+      el.append(b);
+    }
+    document.querySelectorAll('.native-sso-btn').forEach(btn => { btn.disabled = !!withCancel; });
+  }
+
+  async function nativeSignIn(strategy) {
+    const label = strategy === 'oauth_apple' ? 'Apple' : 'Google';
+    try {
+      await clerkReady;
+      const signIn = await clerk.client.signIn.create({ strategy, redirectUrl: NATIVE_SSO_REDIRECT });
+      const verifyUrl = signIn.firstFactorVerification && signIn.firstFactorVerification.externalVerificationRedirectURL;
+      if (!verifyUrl) throw new Error('no_redirect');
+      const back = new Promise((resolve, reject) => { nativeSsoWaiting = { resolve, reject }; });
+      setNativeSsoStatus(IS_IOS_APP ? `Finish signing in with ${label}…` : `Finish signing in with ${label} in your browser, then come back here.`, true);
+      if (IS_IOS_APP) await window.Capacitor.Plugins.Browser.open({ url: verifyUrl.toString(), presentationStyle: 'popover' });
+      else if (!(await desktopAppBridge().openSignIn(verifyUrl.toString()))) throw new Error('blocked');
+      const params = new URL(await back).searchParams;
+      if (params.get('error')) throw new Error(params.get('error'));
+      setNativeSsoStatus('Signing you in…', false);
+      const done = await signIn.reload({ rotatingTokenNonce: params.get('rotating_token_nonce') || undefined });
+      let sessionId = done.createdSessionId;
+      // A new person: Google/Apple confirmed who they are, so turn this into a new account.
+      if (!sessionId && done.firstFactorVerification.status === 'transferable') {
+        const signUp = await clerk.client.signUp.create({ transfer: true });
+        sessionId = signUp.createdSessionId;
+        if (!sessionId) throw new Error('signup_incomplete');
+      }
+      if (!sessionId) throw new Error('no_session');
+      await clerk.setActive({ session: sessionId });
+      setNativeSsoStatus(null, false);
+      // The Clerk listener takes it from here (loads this account's data and opens the app).
+    } catch (e) {
+      console.error('CreativeFlow: ' + label + ' sign-in failed', e);
+      const msg = e && e.message === 'cancelled' ? null
+        : e && e.message === 'signup_incomplete' ? `Your ${label} account is connected, but sign-up needs one more step. Use "Sign up" with your email below.`
+        : `Couldn't sign in with ${label}. Try again, or use your email below.`;
+      setNativeSsoStatus(msg, false);
+    }
+  }
+  document.querySelectorAll('.native-sso-btn').forEach(btn => btn.addEventListener('click', () => nativeSignIn(btn.dataset.strategy)));
+
   async function openClerkAuth(mode) {
+    setNativeSsoStatus(null, false);
     switchScreen('auth');
     document.getElementById('authTitle').textContent = mode === 'signup' ? 'Sign Up' : 'Sign In';
     const mount = document.getElementById('clerk-auth-mount');
@@ -10155,7 +11223,7 @@ Give concise, specific, practical feedback grounded in the material above when a
   // ---------- Installable app ----------
   // The service worker keeps a copy of CreativeFlow so the installed app opens without the
   // local server. "Install CreativeFlow" only shows when the browser says it's installable.
-  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  if ('serviceWorker' in navigator && location.protocol !== 'file:' && !document.documentElement.classList.contains('ios-app')) {
     navigator.serviceWorker.register('sw.js').catch(e => console.error('CreativeFlow: service worker failed', e));
   }
   let installPrompt = null;
