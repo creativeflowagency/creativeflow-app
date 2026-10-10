@@ -44,6 +44,8 @@
   // Set to false to go back to the previous look; everything for it is in the "cf-v2" CSS layer.
   window.CF_NEW_LOOK = true;
   if (window.CF_NEW_LOOK) document.documentElement.classList.add('cf-v2');
+  // Signed in on this device last time: don't flash the welcome screen while the app starts.
+  try { const m = JSON.parse(localStorage.getItem('slate.sync.v1') || 'null'); if (m && m.userId) document.documentElement.classList.add('cf-resume'); } catch (e) {}
   // Inside the iPhone app (Capacitor) the page gets an "ios-app" class: it hides what Apple's rules don't allow there
   // (links to buy a membership elsewhere) and what can't work there (Google sign-in inside an app, offline caching).
   if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
@@ -431,6 +433,8 @@
   .splash-content { position: relative; z-index: 1; width: 100%; max-width: 520px; margin: 0 auto; box-sizing: border-box;
     padding: 0 24px calc(22px + var(--safe-bottom)); animation: spIn 0.6s cubic-bezier(0.2, 0.9, 0.25, 1) both; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
   @keyframes spIn { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+  /* The logo is already the centrepiece of the picture above, so no small logo, name or BETA tag here. */
+  .splash-v2 .splash-brand { display: none !important; }
   .splash-brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; color: #CFC6EE; margin-bottom: 10px; }
   .splash-v2 .splash-logo { width: 28px; height: 28px; border-radius: 8px; margin: 0; }
   .splash-v2 .splash-welcome-back { text-align: left; margin: 0 0 6px; }
@@ -3975,6 +3979,11 @@
 
   /* ---------- Bottom tab bar (phones only) ---------- */
   .tab-bar { display: none; }
+  html.cf-resume #screen-splash > * { visibility: hidden; }
+  /* Account only shows in the iPhone app's bottom bar, in Adonis's place (Adonis is hidden there). */
+  html:not(.ios-app) #tabBar .tab-bar-account { display: none !important; }
+  /* Phones: the calendar is in the bottom bar, so not in the top bar too. */
+  @media (max-width: 699px) { #topbarCalendarBtn { display: none; } }
   @media (max-width: 699px) {
     body.has-tab-bar .tab-bar {
       display: flex;
@@ -5306,6 +5315,10 @@
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M3 9.5h18M8 3v3M16 3v3"/></svg>
     <span>Calendar</span>
   </button>
+  <button type="button" class="tab-bar-item tab-bar-account" id="tabBarAccountBtn" aria-label="Account">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20.5c.8-3.9 4-6.5 8-6.5s7.2 2.6 8 6.5"/></svg>
+    <span>Account</span>
+  </button>
   <button type="button" class="tab-bar-item" data-screen="ai" aria-label="Ask Adonis">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
     <span>Adonis</span>
@@ -5600,13 +5613,18 @@
   // ---------- Version, what's new, bug reports ----------
   // Keep APP_VERSION in step with "version" in package.json. The desktop app reports its real
   // version itself; this is what the web/phone version shows.
-  const APP_VERSION = '1.0.17';
+  const APP_VERSION = '1.0.18';
   // The iPhone app is the free Basic app until Apple in-app purchases are added: no AI, plans or Max.
   const IOS_FREE = document.documentElement.classList.contains('ios-app');
   window.CF_APP_VERSION = APP_VERSION;
   const REPORT_URL = 'https://creativeflow-ai.netlify.app/api/report';
   // Newest first. Add an entry for every release; only the newest is shown on the Updates & help page.
   const CHANGELOG = [
+    { version: '1.0.18', date: '2026-10-10', changes: [
+      'Opening the app while signed in goes straight to your home screen.',
+      'Signing in no longer asks the setup questions again.',
+      'A cleaner welcome screen, and on phones the bottom bar has Account and the top bar has more room for search.'
+    ] },
     { version: '1.0.17', date: '2026-10-10', changes: [
       'A new welcome screen built around the CreativeFlow logo.',
       'Search is easier to use: it finds videos and ideas, highlights what matches, and stretches across the top on phones.',
@@ -10136,6 +10154,9 @@
     });
   });
 
+  // iPhone bottom bar: Account opens the Account sheet (same as ☰ → Account).
+  document.getElementById('tabBarAccountBtn').addEventListener('click', () => document.getElementById('accountBtn').click());
+
   document.getElementById('backBtn').addEventListener('click', () => {
     currentProjectId = null;
     renderHome();
@@ -12712,7 +12733,15 @@ Give concise, specific, practical feedback grounded in the material above when a
     return 'h' + h.toString(36) + str.length;
   }
 
+  // An account that already has a channel name, videos, ideas or XP has done setup, even if the
+  // "done" flag hasn't arrived yet (or was lost).
+  function accountLooksSetUp() {
+    const p = state.profile;
+    return !!(p.onboarded || (p.channelName && p.channelName.trim()) || state.projects.length || state.inbox.length || (p.xp || 0) > 0);
+  }
+
   function afterAuthSuccess() {
+    if (!state.profile.onboarded && accountLooksSetUp()) { state.profile.onboarded = true; save(); }
     if (state.profile.onboarded) {
       switchScreen('home');
       renderHomePersonalization();
@@ -12994,6 +13023,8 @@ Give concise, specific, practical feedback grounded in the material above when a
     if (clerk.user) {
       await startSync(clerk.user.id); // bring in this account's data before choosing a screen
       afterAuthSuccess();
+    } else if (currentScreenName() !== 'splash' && currentScreenName() !== 'auth' && currentScreenName() !== 'legal') {
+      switchScreen('splash'); // the sign-in expired: back to the welcome screen
     }
     try {
       if (sessionStorage.getItem('slate.signedOutToast')) {
@@ -14090,7 +14121,7 @@ Give concise, specific, practical feedback grounded in the material above when a
   const SYNC_META_KEY = 'slate.sync.v1';
   const SYNC_DELAY_MS = 3000;
   const SYNC_PULL_EVERY_MS = 5 * 60 * 1000;
-  const SYNC_FIRST_PULL_WAIT_MS = 6000;
+  const SYNC_FIRST_PULL_WAIT_MS = 15000;
   const SYNC_MAX_CHARS = 4_400_000;
   // Saved per account. Everything else (license status, passcodes, device info) stays on the device.
   const SYNCED_FIELDS = ['projects', 'inbox', 'playlists', 'aiChats', 'profile', 'dailyPlanner', 'usageDaily'];
@@ -14184,7 +14215,8 @@ Give concise, specific, practical feedback grounded in the material above when a
     const screen = currentScreenName();
     // The account's data arrived after setup started (a slow first download): it has already
     // done setup, so skip it.
-    if (screen === 'onboarding' && state.profile.onboarded) {
+    if (screen === 'onboarding' && accountLooksSetUp()) {
+      if (!state.profile.onboarded) { state.profile.onboarded = true; save(); }
       switchScreen('home');
       return;
     }
@@ -14215,6 +14247,7 @@ Give concise, specific, practical feedback grounded in the material above when a
     if (remote && remote.data) {
       const local = syncedSnapshot();
       const merged = mergeSynced(syncMeta.base || defaultSnapshot(), local, remote.data);
+      if (remote.data.profile && remote.data.profile.onboarded && merged.profile) merged.profile.onboarded = true;
       if (!sameData(merged, local)) applySynced(merged);
     }
     syncMeta.version = remote ? remote.version : 0;
@@ -14363,6 +14396,8 @@ Give concise, specific, practical feedback grounded in the material above when a
   renderAccountTopbarIcon();
   renderSplashWelcomeBack();
   renderBurgerSignInOutLabel();
+  if (document.documentElement.classList.contains('cf-resume') && syncMeta.userId && accountLooksSetUp()) switchScreen('home');
+  document.documentElement.classList.remove('cf-resume');
   recheckLicenseInBackground();
   setInterval(recheckLicenseInBackground, LICENSE_RECHECK_HOURS * 60 * 60 * 1000);
   window.addEventListener('online', recheckLicenseInBackground);
